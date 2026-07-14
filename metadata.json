@@ -1,0 +1,6 @@
+{
+  "name": "Teratak Kita",
+  "description": "A mobile-first shared house rental and utility expense split manager featuring instant camera receipt uploads, invoice document attachments, and CSV report exports.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
