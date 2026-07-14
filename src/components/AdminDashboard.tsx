@@ -184,29 +184,47 @@ export default function AdminDashboard({ currentProfile, onLogout, isSwitched, o
   };
 
   useEffect(() => {
-    // 1. 页面首次加载，先抓取一次初始数据
-    loadDashboardData();
+    // 1. 先安全加载初始数据
+    try {
+      loadDashboardData();
+    } catch (e) {
+      console.error("加载初始数据失败:", e);
+    }
 
-    // 2. 开启 Supabase 实时监听通道
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // 监听所有动作：插入(INSERT)、更新(UPDATE)、删除(DELETE)
-          schema: 'public',
-        },
-        (payload) => {
-          console.log('数据库有变动，正在自动同步...', payload);
-          // 只要云端数据一变，立刻重新执行加载函数，刷新页面数字！
-          loadDashboardData();
-        }
-      )
-      .subscribe();
+    // 2. 安全初始化 Realtime 监听
+    let channel: any = null;
+    
+    try {
+      // ⚠️ 如果你顶部引入的是 realSupabase，请把这里的 supabase 改为 realSupabase
+      if (supabase && typeof supabase.channel === 'function') {
+        channel = supabase
+          .channel('schema-db-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+            },
+            (payload) => {
+              console.log('数据有变动，正在同步...', payload);
+              loadDashboardData();
+            }
+          )
+          .subscribe();
+      }
+    } catch (error) {
+      console.error("Supabase Realtime 初始化失败，但不会让页面卡死:", error);
+    }
 
-    // 3. 组件卸载时，自动关闭通道释放内存
+    // 3. 组件卸载时释放
     return () => {
-      supabase.removeChannel(channel);
+      try {
+        if (channel && supabase && typeof supabase.removeChannel === 'function') {
+          supabase.removeChannel(channel);
+        }
+      } catch (err) {
+        console.error("释放通道失败:", err);
+      }
     };
   }, []);
 
