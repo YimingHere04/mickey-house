@@ -184,7 +184,30 @@ export default function AdminDashboard({ currentProfile, onLogout, isSwitched, o
   };
 
   useEffect(() => {
+    // 1. 页面首次加载，先抓取一次初始数据
     loadDashboardData();
+
+    // 2. 开启 Supabase 实时监听通道
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // 监听所有动作：插入(INSERT)、更新(UPDATE)、删除(DELETE)
+          schema: 'public',
+        },
+        (payload) => {
+          console.log('数据库有变动，正在自动同步...', payload);
+          // 只要云端数据一变，立刻重新执行加载函数，刷新页面数字！
+          loadDashboardData();
+        }
+      )
+      .subscribe();
+
+    // 3. 组件卸载时，自动关闭通道释放内存
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Handle User Create
