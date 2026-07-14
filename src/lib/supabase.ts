@@ -223,15 +223,16 @@ class MockQueryBuilder {
       return { data, error: null };
     }
 
-    // 💡 2. 拦截 INSERT 操作（写入云端）
+    // 💡 2. 拦截 INSERT 操作（完美适配自动拆分版）
     if (this.operation === 'insert') {
       const records = this.operationPayload;
       const recordsArray = Array.isArray(records) ? records : [records];
       const createdRecords: any[] = [];
 
       for (const record of recordsArray) {
+        // 生成本地临时 ID 作为备用
         const id = record.id || `id-${Math.random().toString(36).substr(2, 9)}`;
-        const newRecord = {
+        let newRecord = {
           ...record,
           id,
           created_at: record.created_at || new Date().toISOString()
@@ -239,14 +240,24 @@ class MockQueryBuilder {
 
         try {
           if (realSupabase) {
-            const { error: cloudInsertErr } = await realSupabase.from(this.table).insert([newRecord]);
-            if (cloudInsertErr) console.error("同步云端写入失败:", cloudInsertErr);
+            // 🌟 核心修复：添加 .select() 强行让云端返回带真 ID 的数据
+            const { data: cloudInserted, error: cloudInsertErr } = await realSupabase
+              .from(this.table)
+              .insert([record]) // 直接把前端传进来的对象送进去，让云端自己去跑默认值
+              .select();
+
+            if (cloudInsertErr) {
+              console.error("同步云端写入失败:", cloudInsertErr);
+            } else if (cloudInserted && cloudInserted.length > 0) {
+              // 使用云端真实返回的数据（包含真实的数据库 ID）
+              newRecord = cloudInserted[0];
+            }
           }
         } catch (e) {
           console.error("无法写入 Supabase 数据库:", e);
         }
 
-        // 同时维持本地状态防止局部组件断联
+        // 维持同步状态
         if (this.table === 'profiles' || this.table === 'users') {
           mockUsers.push(newRecord as UserProfile);
         } else if (this.table === 'bills') {
