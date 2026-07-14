@@ -519,13 +519,5 @@ export const demoSupabase = {
   }
 };
 
-// 强行把真实的 Supabase 实例塞给全站，彻底断绝 LocalStorage 假数据的路
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
-
-// 无论 IS_DEMO_MODE 是什么，强行导出真正的云端客户端
-export const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
-export const realSupabase = supabase;
-export const IS_DEMO_MODE = false;
+// 确保全站的组件（包括 Login）都能正确拿到 supabase 实例
+export const supabase = realSupabase;
