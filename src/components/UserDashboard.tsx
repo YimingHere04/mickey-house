@@ -107,7 +107,48 @@ export default function UserDashboard({ currentProfile, onLogout, isSwitched, on
   };
 
   useEffect(() => {
-    loadUserPayments();
+    // 1. 先安全加载初始数据
+    try {
+      loadDashboardData();
+    } catch (e) {
+      console.error("加载初始数据失败:", e);
+    }
+
+    // 2. 安全初始化 Realtime 监听
+    let channel: any = null;
+    
+    try {
+      // ⚠️ 如果你顶部引入的是 realSupabase，请把这里的 supabase 改为 realSupabase
+      if (supabase && typeof supabase.channel === 'function') {
+        channel = supabase
+          .channel('schema-db-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+            },
+            (payload) => {
+              console.log('数据有变动，正在同步...', payload);
+              loadDashboardData();
+            }
+          )
+          .subscribe();
+      }
+    } catch (error) {
+      console.error("Supabase Realtime 初始化失败，但不会让页面卡死:", error);
+    }
+
+    // 3. 组件卸载时释放
+    return () => {
+      try {
+        if (channel && supabase && typeof supabase.removeChannel === 'function') {
+          supabase.removeChannel(channel);
+        }
+      } catch (err) {
+        console.error("释放通道失败:", err);
+      }
+    };
   }, []);
 
   // Handle Receipt Upload (Camera or File select)
